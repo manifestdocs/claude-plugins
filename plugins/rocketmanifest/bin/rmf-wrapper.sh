@@ -1,12 +1,13 @@
 #!/bin/bash
-# RocketManifest wrapper - downloads binary on first use
-# This avoids bundling the binary in the plugin repo
+# RocketManifest wrapper - auto-downloads latest binary
+# Self-updating: queries GitHub for latest release
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RMF_BIN="$SCRIPT_DIR/rmf"
-VERSION="0.1.7"
+REPO="rocket-tycoon/rocket-manifest"
+VERSION_FILE="$SCRIPT_DIR/.version"
 
 # Detect platform
 case "$(uname -s)" in
@@ -30,45 +31,97 @@ case "$(uname -s)" in
         ;;
 esac
 
-# Check if we need to download (missing or wrong version)
+# Get latest version from GitHub API
+get_latest_version() {
+    if command -v curl &> /dev/null; then
+        curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/'
+    elif command -v wget &> /dev/null; then
+        wget -qO- "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/'
+    fi
+}
+
+# Get installed version
+get_installed_version() {
+    if [ -f "$VERSION_FILE" ]; then
+        cat "$VERSION_FILE"
+    else
+        echo "none"
+    fi
+}
+
+# Check if we need to download
 NEED_DOWNLOAD=false
+INSTALLED_VERSION=$(get_installed_version)
+
 if [ ! -x "$RMF_BIN" ]; then
     NEED_DOWNLOAD=true
+    LATEST_VERSION=$(get_latest_version)
 else
-    # Check installed version matches expected version
-    INSTALLED_VERSION=$("$RMF_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' || echo "unknown")
-    if [ "$INSTALLED_VERSION" != "$VERSION" ]; then
-        echo "Updating RocketManifest from $INSTALLED_VERSION to $VERSION..." >&2
-        NEED_DOWNLOAD=true
+    # Check for updates (cache check for 24 hours to avoid API rate limits)
+    CHECK_FILE="$SCRIPT_DIR/.last_check"
+    CURRENT_TIME=$(date +%s)
+
+    if [ -f "$CHECK_FILE" ]; then
+        LAST_CHECK=$(cat "$CHECK_FILE")
+        TIME_DIFF=$((CURRENT_TIME - LAST_CHECK))
+    else
+        TIME_DIFF=999999
+    fi
+
+    # Check every 24 hours (86400 seconds)
+    if [ $TIME_DIFF -gt 86400 ]; then
+        LATEST_VERSION=$(get_latest_version)
+        echo "$CURRENT_TIME" > "$CHECK_FILE"
+
+        if [ -n "$LATEST_VERSION" ] && [ "$LATEST_VERSION" != "$INSTALLED_VERSION" ]; then
+            echo "Updating RocketManifest from $INSTALLED_VERSION to $LATEST_VERSION..." >&2
+            NEED_DOWNLOAD=true
+        fi
     fi
 fi
 
 if [ "$NEED_DOWNLOAD" = true ]; then
-    echo "Downloading RocketManifest $VERSION for $PLATFORM..." >&2
-
-    DOWNLOAD_URL="https://github.com/rocket-tycoon/rocket-manifest/releases/download/v${VERSION}/rmf-v${VERSION}-${PLATFORM}.tar.gz"
-
-    # Create temp directory
-    TMP_DIR=$(mktemp -d)
-    trap "rm -rf $TMP_DIR" EXIT
-
-    # Download and extract
-    if command -v curl &> /dev/null; then
-        curl -fsSL "$DOWNLOAD_URL" -o "$TMP_DIR/rmf.tar.gz"
-    elif command -v wget &> /dev/null; then
-        wget -q "$DOWNLOAD_URL" -O "$TMP_DIR/rmf.tar.gz"
-    else
-        echo "Error: curl or wget required" >&2
-        exit 1
+    if [ -z "$LATEST_VERSION" ]; then
+        LATEST_VERSION=$(get_latest_version)
     fi
 
-    tar -xzf "$TMP_DIR/rmf.tar.gz" -C "$TMP_DIR"
+    if [ -z "$LATEST_VERSION" ]; then
+        echo "Error: Could not determine latest version" >&2
+        if [ -x "$RMF_BIN" ]; then
+            echo "Using existing binary" >&2
+        else
+            exit 1
+        fi
+    else
+        echo "Downloading RocketManifest $LATEST_VERSION for $PLATFORM..." >&2
 
-    # Move binary to plugin bin directory
-    mv "$TMP_DIR/rmf" "$RMF_BIN"
-    chmod +x "$RMF_BIN"
+        DOWNLOAD_URL="https://github.com/$REPO/releases/download/v${LATEST_VERSION}/rmf-v${LATEST_VERSION}-${PLATFORM}.tar.gz"
 
-    echo "RocketManifest installed successfully" >&2
+        # Create temp directory
+        TMP_DIR=$(mktemp -d)
+        trap "rm -rf $TMP_DIR" EXIT
+
+        # Download and extract
+        if command -v curl &> /dev/null; then
+            curl -fsSL "$DOWNLOAD_URL" -o "$TMP_DIR/rmf.tar.gz"
+        elif command -v wget &> /dev/null; then
+            wget -q "$DOWNLOAD_URL" -O "$TMP_DIR/rmf.tar.gz"
+        else
+            echo "Error: curl or wget required" >&2
+            exit 1
+        fi
+
+        tar -xzf "$TMP_DIR/rmf.tar.gz" -C "$TMP_DIR"
+
+        # Move binary to plugin bin directory
+        mv "$TMP_DIR/rmf" "$RMF_BIN"
+        chmod +x "$RMF_BIN"
+
+        # Record installed version
+        echo "$LATEST_VERSION" > "$VERSION_FILE"
+
+        echo "RocketManifest $LATEST_VERSION installed successfully" >&2
+    fi
 fi
 
 # Execute rmf with all arguments

@@ -1,2 +1,6 @@
 # Downloaded binary (30MB) - downloaded on first use by rkt-wrapper.sh
 rkt
+
+# Auto-update state files
+.version
+.last_check
