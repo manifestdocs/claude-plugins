@@ -23,7 +23,7 @@
     {
       "name": "rocketmanifest",
       "description": "Living feature documentation for AI-assisted development",
-      "version": "0.1.7",
+      "version": "0.1.8",
       "author": {
         "name": "Rocket Tycoon",
         "url": "https://github.com/rocket-tycoon"
