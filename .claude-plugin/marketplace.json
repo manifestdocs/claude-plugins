@@ -21,9 +21,9 @@
       "tags": ["code-navigation", "semantic-search", "mcp", "find-callers", "dependency-graph"]
     },
     {
-      "name": "rocketmanifest",
+      "name": "manifest",
       "description": "Living feature documentation for AI-assisted development",
-      "version": "0.1.8",
+      "version": "0.1.15",
       "author": {
         "name": "Rocket Tycoon",
         "url": "https://github.com/rocket-tycoon"
