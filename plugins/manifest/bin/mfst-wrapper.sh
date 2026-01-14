@@ -1,17 +1,17 @@
 #!/bin/bash
-# RocketManifest wrapper - downloads binary on first use
+# Manifest wrapper - downloads binary on first use
 # This avoids bundling the binary in the plugin repo
 
 set -e
 
-# Prefer system-installed rmf (Homebrew) over downloading
-if command -v rmf &> /dev/null; then
-    exec rmf "$@"
+# Prefer system-installed mfst (Homebrew) over downloading
+if command -v mfst &> /dev/null; then
+    exec mfst "$@"
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-RMF_BIN="$SCRIPT_DIR/rmf"
-VERSION="0.1.13"
+MFST_BIN="$SCRIPT_DIR/mfst"
+VERSION="0.1.14"
 
 # Detect platform
 case "$(uname -s)" in
@@ -37,21 +37,21 @@ esac
 
 # Check if we need to download (missing or wrong version)
 NEED_DOWNLOAD=false
-if [ ! -x "$RMF_BIN" ]; then
+if [ ! -x "$MFST_BIN" ]; then
     NEED_DOWNLOAD=true
 else
     # Check installed version matches expected version
-    INSTALLED_VERSION=$("$RMF_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' || echo "unknown")
+    INSTALLED_VERSION=$("$MFST_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' || echo "unknown")
     if [ "$INSTALLED_VERSION" != "$VERSION" ]; then
-        echo "Updating RocketManifest from $INSTALLED_VERSION to $VERSION..." >&2
+        echo "Updating Manifest from $INSTALLED_VERSION to $VERSION..." >&2
         NEED_DOWNLOAD=true
     fi
 fi
 
 if [ "$NEED_DOWNLOAD" = true ]; then
-    echo "Downloading RocketManifest $VERSION for $PLATFORM..." >&2
+    echo "Downloading Manifest $VERSION for $PLATFORM..." >&2
 
-    DOWNLOAD_URL="https://github.com/rocket-tycoon/rocket-manifest/releases/download/v${VERSION}/rmf-v${VERSION}-${PLATFORM}.tar.gz"
+    DOWNLOAD_URL="https://github.com/rocket-tycoon/manifest/releases/download/v${VERSION}/mfst-v${VERSION}-${PLATFORM}.tar.gz"
 
     # Create temp directory
     TMP_DIR=$(mktemp -d)
@@ -59,22 +59,22 @@ if [ "$NEED_DOWNLOAD" = true ]; then
 
     # Download and extract
     if command -v curl &> /dev/null; then
-        curl -fsSL "$DOWNLOAD_URL" -o "$TMP_DIR/rmf.tar.gz"
+        curl -fsSL "$DOWNLOAD_URL" -o "$TMP_DIR/mfst.tar.gz"
     elif command -v wget &> /dev/null; then
-        wget -q "$DOWNLOAD_URL" -O "$TMP_DIR/rmf.tar.gz"
+        wget -q "$DOWNLOAD_URL" -O "$TMP_DIR/mfst.tar.gz"
     else
         echo "Error: curl or wget required" >&2
         exit 1
     fi
 
-    tar -xzf "$TMP_DIR/rmf.tar.gz" -C "$TMP_DIR"
+    tar -xzf "$TMP_DIR/mfst.tar.gz" -C "$TMP_DIR"
 
     # Move binary to plugin bin directory
-    mv "$TMP_DIR/rmf" "$RMF_BIN"
-    chmod +x "$RMF_BIN"
+    mv "$TMP_DIR/mfst" "$MFST_BIN"
+    chmod +x "$MFST_BIN"
 
-    echo "RocketManifest installed successfully" >&2
+    echo "Manifest installed successfully" >&2
 fi
 
-# Execute rmf with all arguments
-exec "$RMF_BIN" "$@"
+# Execute mfst with all arguments
+exec "$MFST_BIN" "$@"
