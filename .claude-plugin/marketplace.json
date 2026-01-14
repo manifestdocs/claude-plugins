@@ -28,7 +28,7 @@
         "name": "Rocket Tycoon",
         "url": "https://github.com/rocket-tycoon"
       },
-      "source": "./plugins/rocketmanifest",
+      "source": "./plugins/manifest",
       "category": "mcp",
       "homepage": "https://github.com/rocket-tycoon/rocket-manifest",
       "tags": ["feature-management", "documentation", "mcp", "product-management", "ai-agents"]
