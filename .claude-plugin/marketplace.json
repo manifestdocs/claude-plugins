@@ -10,7 +10,7 @@
     {
       "name": "rocketindex",
       "description": "Semantic code navigation - find callers, definitions, and dependencies without grep",
-      "version": "0.1.0-beta.33",
+      "version": "0.1.0-beta.34",
       "author": {
         "name": "Rocket Tycoon",
         "url": "https://github.com/rocket-tycoon"

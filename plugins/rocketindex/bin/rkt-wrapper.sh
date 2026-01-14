@@ -11,7 +11,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RKT_BIN="$SCRIPT_DIR/rkt"
-VERSION="0.1.0-beta.33"
+VERSION="0.1.0-beta.34"
 
 # Path to RocketIndex source (relative to marketplace)
 ROCKETINDEX_SRC="$SCRIPT_DIR/../../../../RocketIndex"
