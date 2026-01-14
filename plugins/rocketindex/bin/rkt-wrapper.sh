@@ -1,13 +1,18 @@
 #!/bin/bash
-# RocketIndex wrapper - auto-downloads latest binary
-# Self-updating: queries GitHub for latest release
+# RocketIndex wrapper - downloads binary on first use
+# This avoids bundling the binary in the plugin repo
 
 set -e
 
+# Prefer system-installed rkt (Homebrew) over downloading
+if command -v rkt &> /dev/null; then
+    exec rkt "$@"
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RKT_BIN="$SCRIPT_DIR/rkt"
+VERSION="0.1.0-beta.33"
 REPO="rocket-tycoon/rocket-index"
-VERSION_FILE="$SCRIPT_DIR/.version"
 
 # Detect platform
 case "$(uname -s)" in
@@ -31,97 +36,45 @@ case "$(uname -s)" in
         ;;
 esac
 
-# Get latest version from GitHub API
-get_latest_version() {
-    if command -v curl &> /dev/null; then
-        curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/'
-    elif command -v wget &> /dev/null; then
-        wget -qO- "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/'
-    fi
-}
-
-# Get installed version
-get_installed_version() {
-    if [ -f "$VERSION_FILE" ]; then
-        cat "$VERSION_FILE"
-    else
-        echo "none"
-    fi
-}
-
-# Check if we need to download
+# Check if we need to download (missing or wrong version)
 NEED_DOWNLOAD=false
-INSTALLED_VERSION=$(get_installed_version)
-
 if [ ! -x "$RKT_BIN" ]; then
     NEED_DOWNLOAD=true
-    LATEST_VERSION=$(get_latest_version)
 else
-    # Check for updates (cache check for 24 hours to avoid API rate limits)
-    CHECK_FILE="$SCRIPT_DIR/.last_check"
-    CURRENT_TIME=$(date +%s)
-
-    if [ -f "$CHECK_FILE" ]; then
-        LAST_CHECK=$(cat "$CHECK_FILE")
-        TIME_DIFF=$((CURRENT_TIME - LAST_CHECK))
-    else
-        TIME_DIFF=999999
-    fi
-
-    # Check every 24 hours (86400 seconds)
-    if [ $TIME_DIFF -gt 86400 ]; then
-        LATEST_VERSION=$(get_latest_version)
-        echo "$CURRENT_TIME" > "$CHECK_FILE"
-
-        if [ -n "$LATEST_VERSION" ] && [ "$LATEST_VERSION" != "$INSTALLED_VERSION" ]; then
-            echo "Updating RocketIndex from $INSTALLED_VERSION to $LATEST_VERSION..." >&2
-            NEED_DOWNLOAD=true
-        fi
+    # Check installed version matches expected version
+    INSTALLED_VERSION=$("$RKT_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' || echo "unknown")
+    if [ "$INSTALLED_VERSION" != "$VERSION" ]; then
+        echo "Updating RocketIndex from $INSTALLED_VERSION to $VERSION..." >&2
+        NEED_DOWNLOAD=true
     fi
 fi
 
 if [ "$NEED_DOWNLOAD" = true ]; then
-    if [ -z "$LATEST_VERSION" ]; then
-        LATEST_VERSION=$(get_latest_version)
-    fi
+    echo "Downloading RocketIndex $VERSION for $PLATFORM..." >&2
 
-    if [ -z "$LATEST_VERSION" ]; then
-        echo "Error: Could not determine latest version" >&2
-        if [ -x "$RKT_BIN" ]; then
-            echo "Using existing binary" >&2
-        else
-            exit 1
-        fi
+    DOWNLOAD_URL="https://github.com/$REPO/releases/download/v${VERSION}/rocketindex-v${VERSION}-${PLATFORM}.tar.gz"
+
+    # Create temp directory
+    TMP_DIR=$(mktemp -d)
+    trap "rm -rf $TMP_DIR" EXIT
+
+    # Download and extract
+    if command -v curl &> /dev/null; then
+        curl -fsSL "$DOWNLOAD_URL" -o "$TMP_DIR/rkt.tar.gz"
+    elif command -v wget &> /dev/null; then
+        wget -q "$DOWNLOAD_URL" -O "$TMP_DIR/rkt.tar.gz"
     else
-        echo "Downloading RocketIndex $LATEST_VERSION for $PLATFORM..." >&2
-
-        DOWNLOAD_URL="https://github.com/$REPO/releases/download/v${LATEST_VERSION}/rocketindex-v${LATEST_VERSION}-${PLATFORM}.tar.gz"
-
-        # Create temp directory
-        TMP_DIR=$(mktemp -d)
-        trap "rm -rf $TMP_DIR" EXIT
-
-        # Download and extract
-        if command -v curl &> /dev/null; then
-            curl -fsSL "$DOWNLOAD_URL" -o "$TMP_DIR/rkt.tar.gz"
-        elif command -v wget &> /dev/null; then
-            wget -q "$DOWNLOAD_URL" -O "$TMP_DIR/rkt.tar.gz"
-        else
-            echo "Error: curl or wget required" >&2
-            exit 1
-        fi
-
-        tar -xzf "$TMP_DIR/rkt.tar.gz" -C "$TMP_DIR"
-
-        # Move binary to plugin bin directory
-        mv "$TMP_DIR/rkt" "$RKT_BIN"
-        chmod +x "$RKT_BIN"
-
-        # Record installed version
-        echo "$LATEST_VERSION" > "$VERSION_FILE"
-
-        echo "RocketIndex $LATEST_VERSION installed successfully" >&2
+        echo "Error: curl or wget required" >&2
+        exit 1
     fi
+
+    tar -xzf "$TMP_DIR/rkt.tar.gz" -C "$TMP_DIR"
+
+    # Move binary to plugin bin directory
+    mv "$TMP_DIR/rkt" "$RKT_BIN"
+    chmod +x "$RKT_BIN"
+
+    echo "RocketIndex $VERSION installed successfully" >&2
 fi
 
 # Execute rkt with all arguments
