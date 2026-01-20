@@ -1,6 +1,6 @@
 {
   "name": "manifest",
-  "version": "0.1.26",
+  "version": "0.1.27",
   "description": "Living feature documentation for AI-assisted development",
   "author": {
     "name": "Rocket Tycoon",
@@ -11,7 +11,7 @@
   "license": "BUSL-1.1",
   "keywords": ["feature-management", "documentation", "product-management", "ai-agents", "mcp"],
   "mcpServers": {
-    "manifest": {
+    "mcp": {
       "command": "${CLAUDE_PLUGIN_ROOT}/bin/manifest-wrapper.sh",
       "args": ["mcp"]
     }
