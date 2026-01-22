@@ -1,80 +1,33 @@
 #!/bin/bash
-# Manifest wrapper - downloads binary on first use
-# This avoids bundling the binary in the plugin repo
+# Manifest wrapper - delegates to system-installed manifest binary
+# Prompts for Homebrew installation if not found
 
 set -e
 
-# Prefer system-installed manifest (Homebrew) over downloading
+# Check for system-installed manifest (via Homebrew or other package manager)
 if command -v manifest &> /dev/null; then
     exec manifest "$@"
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MANIFEST_BIN="$SCRIPT_DIR/manifest"
-VERSION="0.1.27"
+# manifest not found - prompt user to install via Homebrew
+cat >&2 << 'EOF'
 
-# Detect platform
-case "$(uname -s)" in
-    Darwin)
-        case "$(uname -m)" in
-            arm64) PLATFORM="aarch64-apple-darwin" ;;
-            x86_64) PLATFORM="x86_64-apple-darwin" ;;
-            *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
-        esac
-        ;;
-    Linux)
-        case "$(uname -m)" in
-            x86_64) PLATFORM="x86_64-unknown-linux-gnu" ;;
-            aarch64) PLATFORM="aarch64-unknown-linux-gnu" ;;
-            *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
-        esac
-        ;;
-    *)
-        echo "Unsupported OS: $(uname -s)" >&2
-        exit 1
-        ;;
-esac
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Manifest server not found
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# Check if we need to download (missing or wrong version)
-NEED_DOWNLOAD=false
-if [ ! -x "$MANIFEST_BIN" ]; then
-    NEED_DOWNLOAD=true
-else
-    # Check installed version matches expected version
-    INSTALLED_VERSION=$("$MANIFEST_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?' || echo "unknown")
-    if [ "$INSTALLED_VERSION" != "$VERSION" ]; then
-        echo "Updating Manifest from $INSTALLED_VERSION to $VERSION..." >&2
-        NEED_DOWNLOAD=true
-    fi
-fi
+  Install via Homebrew:
 
-if [ "$NEED_DOWNLOAD" = true ]; then
-    echo "Downloading Manifest $VERSION for $PLATFORM..." >&2
+    brew tap rocket-tycoon/tap
+    brew install manifest
 
-    DOWNLOAD_URL="https://github.com/rocket-tycoon/manifest/releases/download/v${VERSION}/manifest-v${VERSION}-${PLATFORM}.tar.gz"
+  Then restart Claude Code.
 
-    # Create temp directory
-    TMP_DIR=$(mktemp -d)
-    trap "rm -rf $TMP_DIR" EXIT
+  For other installation methods, see:
+  https://github.com/rocket-tycoon/manifest#installation
 
-    # Download and extract
-    if command -v curl &> /dev/null; then
-        curl -fsSL "$DOWNLOAD_URL" -o "$TMP_DIR/manifest.tar.gz"
-    elif command -v wget &> /dev/null; then
-        wget -q "$DOWNLOAD_URL" -O "$TMP_DIR/manifest.tar.gz"
-    else
-        echo "Error: curl or wget required" >&2
-        exit 1
-    fi
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    tar -xzf "$TMP_DIR/manifest.tar.gz" -C "$TMP_DIR"
+EOF
 
-    # Move binary to plugin bin directory
-    mv "$TMP_DIR/manifest" "$MANIFEST_BIN"
-    chmod +x "$MANIFEST_BIN"
-
-    echo "Manifest installed successfully" >&2
-fi
-
-# Execute manifest with all arguments
-exec "$MANIFEST_BIN" "$@"
+exit 1

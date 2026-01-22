@@ -4,10 +4,20 @@ Living feature documentation for AI-assisted development.
 
 ## Installation
 
+**Step 1: Install the Manifest server via Homebrew**
+
 ```bash
-# Install the plugin
+brew tap rocket-tycoon/tap
+brew install manifest
+```
+
+**Step 2: Install the Claude Code plugin**
+
+```bash
 /install-plugin rocket-tycoon/claude-plugins manifest
 ```
+
+The plugin requires the `manifest` binary to be installed on your system. Homebrew is the recommended installation method for macOS and Linux.
 
 ## What it does
 
